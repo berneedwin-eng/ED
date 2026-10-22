@@ -1,0 +1,148 @@
+{
+ "frames": {
+  "brasero_0": {
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 20,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 20,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 20,
+    "h": 32
+   },
+   "duration": 100
+  },
+  "brasero_1": {
+   "frame": {
+    "x": 20,
+    "y": 0,
+    "w": 20,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 20,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 20,
+    "h": 32
+   },
+   "duration": 100
+  },
+  "brasero_2": {
+   "frame": {
+    "x": 40,
+    "y": 0,
+    "w": 20,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 20,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 20,
+    "h": 32
+   },
+   "duration": 100
+  },
+  "brasero_3": {
+   "frame": {
+    "x": 60,
+    "y": 0,
+    "w": 20,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 20,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 20,
+    "h": 32
+   },
+   "duration": 100
+  },
+  "brasero_4": {
+   "frame": {
+    "x": 80,
+    "y": 0,
+    "w": 20,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 20,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 20,
+    "h": 32
+   },
+   "duration": 100
+  },
+  "brasero_5": {
+   "frame": {
+    "x": 100,
+    "y": 0,
+    "w": 20,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 20,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 20,
+    "h": 32
+   },
+   "duration": 100
+  }
+ },
+ "meta": {
+  "app": "pxl",
+  "image": "brasero.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 120,
+   "h": 32
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "brasero",
+    "from": 0,
+    "to": 5,
+    "direction": "forward"
+   }
+  ]
+ }
+}

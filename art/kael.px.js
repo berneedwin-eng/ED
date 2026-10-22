@@ -1,4 +1,4 @@
-// Kael : chevalier original, sprite de combat 64x64 par frame (attente + attaque).
+// Kael : chevalier original, sprite de combat 64x64 par frame (attente, course, saut, attaque).
 // Lumière venant de la gauche (côté adversaire).
 // Build : node .claude/skills/pxl-pixel-art/bin/pxl.js build art/kael.px.js
 pal({
@@ -131,6 +131,8 @@ function trainee(c, cx, cy, r, a0, a1, ep) {
 
 const POSES = {
   garde:   { e: [26, 29], h: [19, 28], ang: -2.0 },
+  course:  { e: [26, 30], h: [21, 30], ang: -2.5 },
+  saut:    { e: [25, 27], h: [20, 25], ang: -2.1 },
   armer:   { e: [30, 30], h: [36, 29], ang: -0.65 },
   frappe:  { e: [24, 28], h: [21, 27], ang: 2.84 },
   suite:   { e: [25, 31], h: [20, 31], ang: 2.2 },
@@ -148,6 +150,59 @@ function kael(c, pose, dy, ph, effet) {
   epee(c, p.h[0], p.h[1] + dy, p.ang)
   epaule(c, p.h[0], p.h[1] + dy, dy)
 }
+
+// Jambe articulée : hanche (hx, hy), genou (kx, ky), cheville (ax, ay). La botte pointe vers la gauche.
+function jambe(c, hx, hy, kx, ky, ax, ay, avant) {
+  c.line(hx, hy, kx, ky, "A", 5), c.line(hx - 1, hy, kx - 1, ky, "L")
+  c.line(kx, ky, ax, ay, "B", 5), c.line(kx - 1, ky, ax - 1, ay, "b")
+  c.poly([ax - 7, ay + 5, ax - 5, ay + 1, ax + 3, ay, ax + 4, ay + 5], "B"), c.hline(ax - 5, ay + 2, 8, "b")
+  if (avant) c.circ(kx, ky, 2, "T"), c.px(kx - 1, ky - 1, "l")
+}
+
+// Pan avant du manteau, rabattu vers l'arrière par le mouvement.
+function panAvant(c, ph, dy) {
+  const w = Math.round(Math.sin(ph + 0.8) * 1.5)
+  c.poly([25, 34 + dy, 30, 35 + dy, 39 + w, 43, 34 + w, 46, 28, 41], "o"), c.line(27, 36 + dy, 35 + w, 44, "O")
+  c.poly([30, 38, 39 + w, 43, 34 + w, 46], "N")
+}
+
+// Corps en mouvement (course, saut) : jambes données, buste incliné.
+function kaelMouvement(c, pose, dy, ph, loin, pres) {
+  manteau(c, ph)
+  echarpe(c, ph, dy)
+  jambe(c, ...loin, false)
+  c.stamp("_buste", 0, dy)
+  jambe(c, ...pres, true)
+  panAvant(c, ph, dy)
+  const p = POSES[pose]
+  bras(c, p.e[0], p.e[1] + dy, p.h[0], p.h[1] + dy, dy)
+  epee(c, p.h[0], p.h[1] + dy, p.ang)
+  epaule(c, p.h[0], p.h[1] + dy, dy)
+}
+
+// Une jambe de course à la phase f : pied devant à f = 0, levé pendant le retour vers l'avant.
+function jambeCourse(hx, f) {
+  const lift = f > Math.PI ? Math.sin(f - Math.PI) * 6 : 0
+  const ax = Math.round(hx - 9 * Math.cos(f)), ay = Math.round(55 - lift)
+  const kx = Math.round((hx + ax) / 2 - 4 - lift * 0.5), ky = Math.round((36 + ay) / 2 + 1 - lift * 0.3)
+  return [hx, 36, kx, ky, ax, ay]
+}
+
+// Course : 6 frames, jambes en opposition, rebond du buste.
+anim("kael_course", { w: 62, h: 62, frames: 6, fps: 12, outline: "k" },
+  (c) => {
+    const f = c.phase * Math.PI * 2
+    const dy = Math.round(Math.abs(Math.sin(f)))
+    kaelMouvement(c, "course", dy, f * 2, jambeCourse(34, f + Math.PI), jambeCourse(29, f))
+  },
+  glow("u", { r: 2, strength: 0.3 }))
+
+// Saut : frame 0 en montée (jambes repliées), frame 1 en descente (jambes tendues).
+anim("kael_saut", { w: 62, h: 62, frames: 2, fps: 4, loop: false, outline: "k" },
+  (c) => c.frame === 0
+    ? kaelMouvement(c, "saut", 0, 1.2, [34, 36, 31, 42, 37, 48], [29, 36, 23, 41, 27, 48])
+    : kaelMouvement(c, "saut", 0, 2.6, [34, 36, 37, 45, 39, 53], [29, 36, 26, 45, 24, 53]),
+  glow("u", { r: 2, strength: 0.3 }))
 
 // Attente : respiration et tissus qui ondulent.
 anim("kael_attente", { w: 62, h: 62, frames: 6, fps: 7, outline: "k" },
@@ -167,3 +222,4 @@ anim("kael_attaque", { w: 62, h: 62, frames: ATTAQUE.length, fps: 10, outline: "
   glow("uU", { r: 3, strength: 0.5 }))
 
 sheet("kael", ["kael_attente", "kael_attaque"], { cols: 8, pad: 1 })
+sheet("kael_jeu", ["kael_attente", "kael_course", "kael_saut", "kael_attaque"], { cols: 8, pad: 1 })
