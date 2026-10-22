@@ -163,8 +163,21 @@
   </section>
 
   <section>
-    <h3>2. La grille</h3>
-    <div class="champs">
+    <h3>2. Les poses</h3>
+    <div class="onglets" role="group" aria-label="Mode de découpe">
+      <button type="button" data-mode="auto" aria-pressed="true">Détection automatique</button>
+      <button type="button" data-mode="grille" aria-pressed="false">Grille régulière</button>
+    </div>
+    <div id="bloc-auto" class="champs-auto">
+      <p>Choisissez l'animation, puis cliquez sur ses poses dans la planche, dans l'ordre. Les cadres bleus sont les poses détectées.</p>
+      <label class="ligne" for="toute-ligne"><input id="toute-ligne" type="checkbox"> Un clic ajoute toute la rangée</label>
+      <div class="ligne">
+        <span id="nb-poses">0 pose</span>
+        <button id="retirer-pose" type="button">Retirer la dernière</button>
+        <button id="vider-poses" type="button">Vider</button>
+      </div>
+    </div>
+    <div id="bloc-grille" class="champs" hidden>
       <label class="champ" for="fw">Largeur frame<input id="fw" type="number" min="4" value="48"></label>
       <label class="champ" for="fh">Hauteur frame<input id="fh" type="number" min="4" value="48"></label>
       <label class="champ" for="gx">Écart horizontal<input id="gx" type="number" min="0" value="0"></label>
@@ -176,15 +189,15 @@
       <button type="button" data-anim="jump" aria-pressed="false">Saut</button>
       <button type="button" data-anim="attack" aria-pressed="false">Attaque</button>
     </div>
-    <div class="champs">
+    <div id="bloc-grille-anim" class="champs" hidden>
       <label class="champ" for="ax">X 1re frame<input id="ax" type="number" min="0" value="0"></label>
       <label class="champ" for="ay">Y 1re frame<input id="ay" type="number" min="0" value="0"></label>
       <label class="champ" for="nb">Nb de frames<input id="nb" type="number" min="1" value="1"></label>
       <label class="champ" for="par-ligne">Frames par ligne<input id="par-ligne" type="number" min="1" value="8"></label>
-      <label class="champ" for="fps">Images / s<input id="fps" type="number" min="1" max="30" value="8"></label>
+      <p style="grid-column: 1 / -1;">Cliquez sur la planche pour placer la première frame de l'animation choisie.</p>
     </div>
-    <p>Cliquez sur la planche pour placer la première frame de l'animation choisie.</p>
     <div class="ligne">
+      <label class="champ" for="fps">Images / s<input id="fps" type="number" min="1" max="30" value="8"></label>
       <label class="champ" for="zoom">Zoom
         <select id="zoom"><option value="1">1×</option><option value="2" selected>2×</option><option value="3">3×</option></select>
       </label>
@@ -203,11 +216,11 @@
           <select id="regard"><option value="left">la gauche</option><option value="right">la droite</option></select>
         </label>
         <label class="champ" for="echelle">Taille en jeu
-          <select id="echelle"><option value="1">1×</option><option value="1.5">1,5×</option><option value="2">2×</option></select>
+          <select id="echelle"><option value="0.5">0,5×</option><option value="0.75">0,75×</option><option value="1">1×</option><option value="1.5">1,5×</option><option value="2">2×</option></select>
         </label>
       </div>
     </div>
-    <p>La croix cyan marque le point posé au sol. Placez-la entre les pieds du personnage.</p>
+    <p>La croix cyan marque le point posé au sol. En détection automatique, il est calculé pour chaque pose ; les champs Pieds ne servent qu'à la grille.</p>
     <div class="actions">
       <button id="appliquer" type="button" class="principal">Jouer avec ce personnage</button>
       <button id="revenir-kael" type="button">Revenir à Kael</button>
@@ -522,8 +535,9 @@ function drawChar(ch, key, t) {
   } else i = frameAt(a, t, key !== "attack")
   const f = a.frames[i], s = ch.scale || 1
   const flip = (player.dir === "right") !== (ch.facing === "right")
-  const ax = flip ? f.w - ch.anchor.x : ch.anchor.x
-  const dx = Math.round(player.x - ax * s - cam.x), dy = Math.round(player.y - player.z - ch.anchor.y * s - cam.y)
+  const fax = f.ax ?? ch.anchor.x, fay = f.ay ?? ch.anchor.y          // point d'appui propre à la pose s'il existe
+  const ax = flip ? f.w - fax : fax
+  const dx = Math.round(player.x - ax * s - cam.x), dy = Math.round(player.y - player.z - fay * s - cam.y)
   if (flip) {
     ctx.save(), ctx.translate(dx + f.w * s, dy), ctx.scale(-1, 1)
     ctx.drawImage(ch.img, f.x, f.y, f.w, f.h, 0, 0, f.w * s, f.h * s)
@@ -621,15 +635,21 @@ function frame(now) {
 // ---------------------------------------------------------------------------------
 const ANIMS = ["idle", "run", "jump", "attack"]
 const STORAGE = "ruines-ambre-personnage"
-const at = { src: null, img: null, sheet: null, current: "idle", cfg: defaultCfg(), previewT: 0 }
+const at = { src: null, img: null, sheet: null, boxes: [], current: "idle", cfg: defaultCfg(), previewT: 0 }
 function defaultCfg() {
   const a = () => ({ x: 0, y: 0, n: 1, row: 8, fps: 8 })
-  return { frame: { w: 48, h: 48 }, gap: { x: 0, y: 0 }, anchor: { x: 24, y: 47 }, facing: "left", scale: 1, removeBg: true, tol: 28, anims: { idle: a(), run: a(), jump: a(), attack: a() } }
+  return {
+    mode: "auto", frame: { w: 48, h: 48 }, gap: { x: 0, y: 0 }, anchor: { x: 24, y: 47 }, facing: "left", scale: 1,
+    removeBg: true, tol: 28, anims: { idle: a(), run: a(), jump: a(), attack: a() },
+    poses: { idle: [], run: [], jump: [], attack: [] },
+  }
 }
 const $ = (id) => document.getElementById(id)
 const num = (id, min = 0) => Math.max(min, Math.floor(Number($(id).value) || 0))
 
-// Rend transparentes les couleurs dominantes du bord de l'image (fond uni ou damier).
+// Rend transparent le fond relié aux bords de l'image : fond uni ou damier, y compris les teintes
+// intermédiaires qu'un JPG crée entre les cases. Les pixels de même couleur à l'intérieur du
+// personnage sont épargnés tant qu'ils ne touchent pas le fond.
 function retirerFond(img, tol) {
   const c = document.createElement("canvas")
   c.width = img.naturalWidth, c.height = img.naturalHeight
@@ -645,17 +665,64 @@ function retirerFond(img, tol) {
   }
   for (let x = 0; x < W; x++) add(x * 4), add(((H - 1) * W + x) * 4)
   for (let y = 0; y < H; y++) add(y * W * 4), add((y * W + W - 1) * 4)
-  const fonds = [...hist.values()].sort((a, b) => b.n - a.n).slice(0, 3)
-    .filter((e, i, arr) => i === 0 || e.n > arr[0].n * 0.15).map((e) => [e.r / e.n, e.g / e.n, e.b / e.n])
+  const tops = [...hist.values()].sort((a, b) => b.n - a.n).map((e) => [e.r / e.n, e.g / e.n, e.b / e.n])
+  const c1 = tops[0], c2 = tops.find((t) => Math.hypot(t[0] - c1[0], t[1] - c1[1], t[2] - c1[2]) > 20) || c1
+  // Distance au segment [c1, c2] : couvre les deux couleurs du damier et leurs mélanges.
+  const sx = c2[0] - c1[0], sy = c2[1] - c1[1], sz = c2[2] - c1[2], L2 = sx * sx + sy * sy + sz * sz || 1
   const t2 = tol * tol
-  for (let i = 0; i < p.length; i += 4) {
-    for (const [r, gg, b] of fonds) {
-      const dr = p[i] - r, dg = p[i + 1] - gg, db = p[i + 2] - b
-      if (dr * dr + dg * dg + db * db <= t2) { p[i + 3] = 0; break }
-    }
+  const estFond = (i) => {
+    const ux = p[i] - c1[0], uy = p[i + 1] - c1[1], uz = p[i + 2] - c1[2]
+    const t = Math.max(0, Math.min(1, (ux * sx + uy * sy + uz * sz) / L2))
+    const dx = ux - t * sx, dy = uy - t * sy, dz = uz - t * sz
+    return dx * dx + dy * dy + dz * dz <= t2
+  }
+  const vu = new Uint8Array(W * H), pile = []
+  const pousser = (k) => { if (!vu[k] && estFond(k * 4)) vu[k] = 1, pile.push(k) }
+  for (let x = 0; x < W; x++) pousser(x), pousser((H - 1) * W + x)
+  for (let y = 0; y < H; y++) pousser(y * W), pousser(y * W + W - 1)
+  while (pile.length) {
+    const k = pile.pop(), x = k % W
+    p[k * 4 + 3] = 0
+    if (x > 0) pousser(k - 1)
+    if (x < W - 1) pousser(k + 1)
+    if (k >= W) pousser(k - W)
+    if (k < W * (H - 1)) pousser(k + W)
   }
   g.putImageData(d, 0, 0)
   return c
+}
+
+// Repère les poses : groupes de pixels opaques, réunis s'ils sont à moins de 4 px l'un de l'autre.
+// Chaque pose reçoit son point d'appui : milieu des pixels de ses 6 dernières lignes, au ras du bas.
+function detecterPoses(sheet) {
+  const W = sheet.width, H = sheet.height
+  const a = sheet.getContext("2d").getImageData(0, 0, W, H).data
+  const C = 4, CW = Math.ceil(W / C), CH = Math.ceil(H / C)
+  const plein = new Uint8Array(CW * CH)
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (a[(y * W + x) * 4 + 3] > 40) plein[((y / C) | 0) * CW + ((x / C) | 0)] = 1
+  const lab = new Int32Array(CW * CH).fill(-1), boxes = []
+  for (let k = 0; k < CW * CH; k++) {
+    if (!plein[k] || lab[k] >= 0) continue
+    const b = { x0: CW, y0: CH, x1: 0, y1: 0, n: 0 }, pile = [k]
+    lab[k] = boxes.length
+    while (pile.length) {
+      const q = pile.pop(), qx = q % CW, qy = (q / CW) | 0
+      b.n++, b.x0 = Math.min(b.x0, qx), b.y0 = Math.min(b.y0, qy), b.x1 = Math.max(b.x1, qx), b.y1 = Math.max(b.y1, qy)
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const nx = qx + dx, ny = qy + dy, nk = ny * CW + nx
+        if (nx >= 0 && ny >= 0 && nx < CW && ny < CH && plein[nk] && lab[nk] < 0) lab[nk] = boxes.length, pile.push(nk)
+      }
+    }
+    boxes.push(b)
+  }
+  return boxes.filter((b) => b.n >= 6).map((b) => {
+    const x = b.x0 * C, y = b.y0 * C, w = Math.min(W, (b.x1 + 1) * C) - x, h = Math.min(H, (b.y1 + 1) * C) - y
+    let bas = y + h - 1
+    while (bas > y && ![...Array(w).keys()].some((i) => a[(bas * W + x + i) * 4 + 3] > 40)) bas--
+    let sum = 0, n = 0
+    for (let yy = Math.max(y, bas - 5); yy <= bas; yy++) for (let i = 0; i < w; i++) if (a[(yy * W + x + i) * 4 + 3] > 40) sum += i, n++
+    return { x, y, w, h, ax: n ? Math.round(sum / n) : w >> 1, ay: bas - y }
+  }).sort((p, q) => (p.y - q.y) || (p.x - q.x))
 }
 
 function framesOf(cfg, a) {
@@ -666,13 +733,14 @@ function framesOf(cfg, a) {
   }
   return out
 }
+const posesOf = (cfg, k) => cfg.mode === "auto" ? cfg.poses[k] : framesOf(cfg, cfg.anims[k])
 function charFromCfg(cfg, sheet) {
   const anims = {}
   for (const k of ANIMS) {
-    const frames = framesOf(cfg, cfg.anims[k])
+    const frames = posesOf(cfg, k).length ? posesOf(cfg, k) : posesOf(cfg, "idle")   // animation vide : on reprend l'attente
     anims[k] = { frames, durs: frames.map(() => 1000 / cfg.anims[k].fps) }
   }
-  return { img: sheet, anims, anchor: cfg.anchor, facing: cfg.facing, scale: cfg.scale, hitFrame: Math.floor(cfg.anims.attack.n / 2) }
+  return { img: sheet, anims, anchor: cfg.anchor, facing: cfg.facing, scale: cfg.scale, hitFrame: Math.floor(anims.attack.frames.length / 2) }
 }
 
 function lireChamps() {
@@ -690,7 +758,12 @@ function ecrireChamps() {
   $("pied-x").value = c.anchor.x, $("pied-y").value = c.anchor.y
   $("regard").value = c.facing, $("echelle").value = String(c.scale)
   $("fond-auto").checked = c.removeBg, $("tolerance").value = c.tol, $("tolerance-val").textContent = c.tol
-  for (const b of document.querySelectorAll(".onglets button")) b.setAttribute("aria-pressed", String(b.dataset.anim === at.current))
+  for (const b of document.querySelectorAll("[data-anim]")) b.setAttribute("aria-pressed", String(b.dataset.anim === at.current))
+  for (const b of document.querySelectorAll("[data-mode]")) b.setAttribute("aria-pressed", String(b.dataset.mode === c.mode))
+  const auto = c.mode === "auto"
+  $("bloc-auto").hidden = !auto, $("bloc-grille").hidden = auto, $("bloc-grille-anim").hidden = auto
+  const n = c.poses[at.current].length
+  $("nb-poses").textContent = n + (n > 1 ? " poses" : " pose")
 }
 
 function traiterImage() {
@@ -701,6 +774,7 @@ function traiterImage() {
     c.getContext("2d").drawImage(at.img, 0, 0)
     return c
   })()
+  at.boxes = detecterPoses(at.sheet)
   dessinerPlanche()
 }
 
@@ -711,10 +785,21 @@ function dessinerPlanche() {
   pc.width = at.sheet.width * z, pc.height = at.sheet.height * z
   g.imageSmoothingEnabled = false
   g.drawImage(at.sheet, 0, 0, pc.width, pc.height)
+  const cadre = (f, couleur, ep) => { g.strokeStyle = couleur, g.lineWidth = ep, g.strokeRect(f.x * z + 0.5, f.y * z + 0.5, f.w * z - 1, f.h * z - 1) }
+  if (at.cfg.mode === "auto") {
+    for (const b of at.boxes) cadre(b, "rgba(95, 216, 244, 0.35)", 1)
+    for (const k of ANIMS) if (k !== at.current) for (const f of at.cfg.poses[k]) cadre(f, "rgba(239, 228, 210, 0.45)", 1)
+    g.font = `700 ${10 + 2 * z}px 'Alegreya Sans', sans-serif`, g.textBaseline = "top"
+    at.cfg.poses[at.current].forEach((f, i) => {
+      cadre(f, "#e8904a", 2)
+      g.fillStyle = "#e8904a", g.fillText(String(i + 1), f.x * z + 3, f.y * z + 2)
+      croix(g, (f.x + f.ax) * z, (f.y + f.ay) * z, 4)
+    })
+    return
+  }
   for (const k of ANIMS) {
     const on = k === at.current
-    g.strokeStyle = on ? "#e8904a" : "rgba(95, 216, 244, 0.45)", g.lineWidth = on ? 2 : 1
-    for (const f of framesOf(at.cfg, at.cfg.anims[k])) g.strokeRect(f.x * z + 0.5, f.y * z + 0.5, f.w * z - 1, f.h * z - 1)
+    for (const f of framesOf(at.cfg, at.cfg.anims[k])) cadre(f, on ? "#e8904a" : "rgba(95, 216, 244, 0.45)", on ? 2 : 1)
   }
   const f0 = framesOf(at.cfg, at.cfg.anims[at.current])[0]
   croix(g, (f0.x + at.cfg.anchor.x) * z, (f0.y + at.cfg.anchor.y) * z, 5)
@@ -734,11 +819,17 @@ function dessinerApercu(dt) {
     return
   }
   at.previewT += dt * 1000
-  const a = at.cfg.anims[at.current], frames = framesOf(at.cfg, a)
+  const a = at.cfg.anims[at.current], frames = posesOf(at.cfg, at.current)
+  if (!frames.length) {
+    g.fillStyle = "#a99bb0", g.font = "14px 'Alegreya Sans', sans-serif", g.textAlign = "center"
+    g.fillText("Cliquez sur une pose", pc.width / 2, 96)
+    return
+  }
   const f = frames[Math.floor(at.previewT / (1000 / a.fps)) % frames.length]
-  const z = Math.max(1, Math.min(3, Math.floor(150 / Math.max(f.w, f.h))))
+  const z = Math.max(0.5, Math.min(3, Math.floor((150 / Math.max(f.w, f.h)) * 2) / 2))
+  const fax = f.ax ?? at.cfg.anchor.x, fay = f.ay ?? at.cfg.anchor.y
   g.imageSmoothingEnabled = false
-  g.drawImage(at.sheet, f.x, f.y, f.w, f.h, 96 - at.cfg.anchor.x * z, 160 - at.cfg.anchor.y * z, f.w * z, f.h * z)
+  g.drawImage(at.sheet, f.x, f.y, f.w, f.h, Math.round(96 - fax * z), Math.round(160 - fay * z), f.w * z, f.h * z)
   croix(g, 96, 160, 6)
 }
 
@@ -759,10 +850,12 @@ function ouvrirImage(src, nouveau) {
       probe.canvas.width = probe.canvas.height = 1
       probe.drawImage(img, 0, 0)
       at.cfg.removeBg = probe.getImageData(0, 0, 1, 1).data[3] > 250
+      at.cfg.poses = defaultCfg().poses
       ecrireChamps()
-      etat(`Planche chargée : ${img.naturalWidth} × ${img.naturalHeight} px. Réglez la taille d'une frame, puis cliquez sur la première frame de chaque animation.`)
+      etat(`Planche chargée : ${img.naturalWidth} × ${img.naturalHeight} px. Choisissez une animation, puis cliquez sur ses poses.`)
     }
     traiterImage()
+    if (nouveau) etat($("etat").textContent + ` ${at.boxes.length} poses détectées.`)
   }
   img.onerror = () => etat("Impossible de lire cette image.")
   img.src = src
@@ -770,6 +863,7 @@ function ouvrirImage(src, nouveau) {
 
 function appliquer(silencieux) {
   if (!at.sheet) { etat("Chargez d'abord une planche de sprites."); return }
+  if (!posesOf(at.cfg, "idle").length) { etat("Ajoutez au moins une pose à l'animation Attente."); return }
   player.char = charFromCfg(at.cfg, at.sheet)
   player.animT = 0, player.attackT = -1
   try { localStorage.setItem(STORAGE, JSON.stringify({ src: at.src, cfg: at.cfg })) } catch {}
@@ -794,16 +888,34 @@ function brancherAtelier() {
     $(id).addEventListener("input", () => { lireChamps(), $("tolerance-val").textContent = at.cfg.tol, traiterImage() })
   }
   $("zoom").addEventListener("change", dessinerPlanche)
-  for (const b of document.querySelectorAll(".onglets button")) {
+  for (const b of document.querySelectorAll("[data-anim]")) {
     b.addEventListener("click", () => { lireChamps(), at.current = b.dataset.anim, at.previewT = 0, ecrireChamps(), dessinerPlanche() })
+  }
+  for (const b of document.querySelectorAll("[data-mode]")) {
+    b.addEventListener("click", () => { lireChamps(), at.cfg.mode = b.dataset.mode, ecrireChamps(), dessinerPlanche() })
   }
   $("planche").addEventListener("click", (e) => {
     if (!at.sheet) return
     const z = Number($("zoom").value), r = e.target.getBoundingClientRect()
-    const a = at.cfg.anims[at.current]
-    a.x = Math.floor((e.clientX - r.left) / z), a.y = Math.floor((e.clientY - r.top) / z)
+    const px = (e.clientX - r.left) / z, py = (e.clientY - r.top) / z
+    if (at.cfg.mode === "auto") {
+      const dist = (b) => Math.hypot(Math.max(b.x - px, 0, px - b.x - b.w), Math.max(b.y - py, 0, py - b.y - b.h))
+      const cible = at.boxes.reduce((m, b) => (!m || dist(b) < dist(m) ? b : m), null)
+      if (!cible || dist(cible) > 8) { etat("Aucune pose à cet endroit. Cliquez sur le personnage."); return }
+      const liste = at.cfg.poses[at.current]
+      if ($("toute-ligne").checked) {
+        const cy = cible.y + cible.h / 2
+        liste.push(...at.boxes.filter((b) => b.y < cy && b.y + b.h > cy && b.h > cible.h * 0.5).sort((p, q) => p.x - q.x).map((b) => ({ ...b })))
+      } else liste.push({ ...cible })
+      at.previewT = 0
+    } else {
+      const a = at.cfg.anims[at.current]
+      a.x = Math.floor(px), a.y = Math.floor(py)
+    }
     ecrireChamps(), dessinerPlanche()
   })
+  $("retirer-pose").addEventListener("click", () => { at.cfg.poses[at.current].pop(), ecrireChamps(), dessinerPlanche() })
+  $("vider-poses").addEventListener("click", () => { at.cfg.poses[at.current] = [], ecrireChamps(), dessinerPlanche() })
   $("appliquer").addEventListener("click", () => appliquer(false))
   $("revenir-kael").addEventListener("click", () => {
     player.char = KAEL, player.animT = 0, player.attackT = -1
@@ -829,7 +941,8 @@ function restaurer() {
   let saved = null
   try { saved = JSON.parse(localStorage.getItem(STORAGE) || "null") } catch {}
   if (!saved || !saved.src || !saved.cfg) return
-  at.cfg = { ...defaultCfg(), ...saved.cfg }
+  const base = defaultCfg()
+  at.cfg = { ...base, ...saved.cfg, poses: { ...base.poses, ...(saved.cfg.poses || {}) } }
   const img = new Image()
   img.onload = () => { at.src = saved.src, at.img = img, traiterImage(), appliquer(true) }
   img.src = saved.src
