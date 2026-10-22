@@ -85,13 +85,18 @@ function murNord(c) {
     c.vline(x, 16, 18, "2"), c.vline(x + 1, 16, 10, "2")
   }
   // Arche effondrée : passage sombre vers l'extérieur.
-  const ax = 320
-  c.rect(ax - 26, 26, 52, NORD - 26, "1"), c.ellipse(ax, 28, 26, 14, "1")
-  c.grad(ax - 22, 30, 44, NORD - 30, "12", "v", 0.5)
-  c.ellipse(ax, 28, 28, 16, "5", true), c.ellipse(ax, 28, 29, 17, "2", true)
-  c.rect(ax - 32, 30, 6, NORD - 30, "4"), c.vline(ax - 32, 30, NORD - 30, "5")
-  c.rect(ax + 26, 30, 6, NORD - 30, "3"), c.vline(ax + 31, 30, NORD - 30, "2")
-  c.rect(ax + 6, 0, 22, 12, "1")                                        // brèche dans le chaperon
+  const ax = 320, ay = 44
+  for (let k = 0; k <= 12; k++) {                                       // claveaux autour de l'arc
+    const a = Math.PI + (k / 12) * Math.PI
+    c.line(ax + Math.round(Math.cos(a) * 24), ay + Math.round(Math.sin(a) * 22),
+           ax + Math.round(Math.cos(a) * 31), ay + Math.round(Math.sin(a) * 29), k % 2 ? "4" : "5", 3)
+  }
+  c.rect(ax - 31, ay, 7, NORD - ay, "4"), c.vline(ax - 31, ay, NORD - ay, "5")   // piédroits
+  c.rect(ax + 24, ay, 7, NORD - ay, "3"), c.vline(ax + 30, ay, NORD - ay, "2")
+  for (let y = ay + 6; y < NORD; y += 8) c.hline(ax - 31, y, 7, "2"), c.hline(ax + 24, y, 7, "2")
+  c.ellipse(ax, ay, 23, 21, "1"), c.rect(ax - 23, ay, 47, NORD - ay, "1")
+  c.grad(ax - 23, ay + 8, 47, NORD - ay - 8, "12", "v", 0.6)          // le passage s'éclaircit vers la cour
+  c.rect(ax + 10, 0, 18, 6, "2"), c.hline(ax + 10, 6, 18, "1")          // pierres manquantes du chaperon
   // Bannières déchirées.
   for (const bx of [196, 444]) {
     c.rect(bx, 20, 16, 34, "T"), c.vline(bx, 20, 34, "t"), c.vline(bx + 15, 20, 34, "t")
@@ -124,9 +129,12 @@ function murets(c) {
 
 scene("ruines_sol", { w: W, h: H, bg: "2" },
   layer("dalles", dalles),
-  layer("chemin",
-    poly([296, SUD, 344, SUD, 340, 340, 352, 300, 288, 300, 300, 340], "d"),
-    noise(286, 300, 70, SUD - 300, "DE", 0.12, 5, "d")),
+  layer("terre", (c) => {                                             // dalles arrachées, terre à nu
+    for (const [x, y, rx, ry] of [[118, 330, 22, 9], [520, 312, 18, 8], [96, 150, 14, 6], [430, 360, 26, 10]]) {
+      c.ellipse(x, y, rx, ry, "d"), c.ellipse(x - 3, y - 2, rx - 5, ry - 3, "D")
+      c.noise(x - rx, y - ry, rx * 2, ry * 2, "E", 0.15, x, "D")
+    }
+  }),
   layer("rosace", (c) => rosace(c, 320, 250)),
   layer("mousse",
     scatter("_touffe_*", 28, NORD, 584, 18, 70, { rflip: "x" }),

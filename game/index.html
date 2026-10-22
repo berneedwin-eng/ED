@@ -1,0 +1,870 @@
+<title>Ruines d'Ambre</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+SC:wght@500;700&family=Alegreya+Sans:wght@400;500;700&display=swap">
+<style>
+  /* Plein écran de jeu ; l'interface flotte au-dessus comme des plaques de pierre gravées. */
+  :root {
+    --night: #120e18;
+    --stone: #211b29;
+    --stone-2: #2d2537;
+    --line: #463b52;
+    --parch: #efe4d2;
+    --dim: #a99bb0;
+    --ember: #e8904a;
+    --rune: #5fd8f4;
+    --display: "Alegreya SC", "Palatino Linotype", Palatino, Georgia, serif;
+    --body: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+    color-scheme: dark;
+  }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; overflow: hidden; }
+  body { background: var(--night); color: var(--parch); font-family: var(--body); font-size: 15px; }
+  #scene { position: fixed; inset: 0; overflow: hidden; touch-action: none; }
+  #jeu { position: absolute; left: 0; top: 0; image-rendering: pixelated; image-rendering: crisp-edges; }
+
+  .hud {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 5; pointer-events: none;
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .plaque {
+    pointer-events: auto; background: color-mix(in srgb, var(--stone) 88%, transparent);
+    border: 1px solid var(--line); border-radius: 4px; padding: 8px 12px;
+    box-shadow: 0 2px 0 #0008;
+  }
+  .titre { display: grid; gap: 2px; max-width: 26rem; }
+  .titre h1 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 20px; letter-spacing: 0.04em; color: var(--ember); }
+  .titre p { margin: 0; color: var(--dim); font-size: 13px; line-height: 1.4; transition: opacity 0.6s; }
+  .titre kbd { font-family: var(--body); font-weight: 700; color: var(--parch); }
+  .droite { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+  .compteur { font-variant-numeric: tabular-nums; font-size: 14px; }
+  .compteur b { color: var(--ember); }
+
+  button {
+    font: inherit; font-weight: 500; color: var(--parch); background: var(--stone-2);
+    border: 1px solid var(--line); border-radius: 4px; padding: 7px 12px; cursor: pointer;
+  }
+  button:hover { border-color: var(--ember); }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--rune); outline-offset: 2px; }
+  button.principal { background: var(--ember); color: #24140a; border-color: var(--ember); font-weight: 700; }
+
+  /* Contrôles tactiles. */
+  .tactile { display: none; }
+  .tactile.actif { display: block; }
+  #manette {
+    position: fixed; z-index: 4; width: 128px; height: 128px; border-radius: 50%;
+    left: calc(max(16px, env(safe-area-inset-left, 0px)) + 8px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+    background: color-mix(in srgb, var(--stone) 55%, transparent); border: 1px solid var(--line);
+  }
+  #manette span {
+    position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px;
+    border-radius: 50%; background: color-mix(in srgb, var(--parch) 30%, transparent); border: 1px solid var(--dim);
+  }
+  .boutons {
+    position: fixed; z-index: 4; display: flex; gap: 14px; align-items: flex-end;
+    right: calc(max(16px, env(safe-area-inset-right, 0px)) + 8px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 28px);
+  }
+  .boutons button {
+    width: 76px; height: 76px; border-radius: 50%; padding: 0; font-family: var(--display); font-size: 15px;
+    background: color-mix(in srgb, var(--stone) 70%, transparent); touch-action: none;
+  }
+  .boutons #b-coup { width: 88px; height: 88px; border-color: var(--ember); color: var(--ember); }
+
+  /* Atelier d'import. */
+  #atelier {
+    position: fixed; z-index: 10; top: 0; right: 0; bottom: 0; width: min(460px, 100%);
+    background: var(--stone); border-left: 1px solid var(--line); overflow-y: auto;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 16px);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    display: grid; gap: 18px; align-content: start;
+  }
+  #atelier header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  #atelier h2 { margin: 0; font-family: var(--display); font-size: 22px; color: var(--ember); text-wrap: balance; }
+  #atelier h3 { margin: 0 0 8px; font-family: var(--display); font-size: 16px; letter-spacing: 0.03em; }
+  #atelier section { display: grid; gap: 10px; min-width: 0; }
+  #atelier p { margin: 0; color: var(--dim); line-height: 1.45; font-size: 14px; }
+  .depot { border: 1px dashed var(--line); border-radius: 4px; padding: 12px; display: grid; gap: 8px; }
+  .depot.survol { border-color: var(--rune); }
+  .champs { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 8px 10px; }
+  label.champ { display: grid; gap: 3px; font-size: 13px; color: var(--dim); }
+  input[type="number"], select {
+    font: inherit; color: var(--parch); background: var(--night); border: 1px solid var(--line);
+    border-radius: 4px; padding: 5px 7px; width: 100%; min-width: 0; font-variant-numeric: tabular-nums;
+  }
+  input[type="range"] { width: 100%; accent-color: var(--ember); }
+  .ligne { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .onglets { display: flex; gap: 6px; flex-wrap: wrap; }
+  .onglets button[aria-pressed="true"] { border-color: var(--ember); color: var(--ember); }
+  .planche {
+    overflow: auto; max-height: 340px; border: 1px solid var(--line); border-radius: 4px;
+    background-color: #2a2431;
+    background-image: linear-gradient(45deg, #332c3b 25%, transparent 25%, transparent 75%, #332c3b 75%),
+                      linear-gradient(45deg, #332c3b 25%, transparent 25%, transparent 75%, #332c3b 75%);
+    background-size: 16px 16px; background-position: 0 0, 8px 8px;
+  }
+  #planche { display: block; image-rendering: pixelated; cursor: crosshair; }
+  .apercu { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  #apercu { image-rendering: pixelated; background: var(--night); border: 1px solid var(--line); border-radius: 4px; max-width: 100%; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  #etat { min-height: 1.4em; color: var(--rune); font-size: 14px; }
+  #config-texte { width: 100%; min-height: 120px; font: 12px/1.4 ui-monospace, monospace; background: var(--night); color: var(--parch); border: 1px solid var(--line); border-radius: 4px; }
+
+  #chargement { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: var(--night); font-family: var(--display); font-size: 20px; color: var(--ember); }
+  @media (prefers-reduced-motion: reduce) { .titre p { transition: none; } }
+</style>
+
+<div id="scene">
+  <canvas id="jeu" aria-label="Cour du château en ruine. Déplacez le personnage au clavier ou avec les commandes tactiles."></canvas>
+</div>
+
+<div class="hud">
+  <div class="plaque titre">
+    <h1>Ruines d'Ambre</h1>
+    <p id="aide"><kbd>ZQSD</kbd> ou <kbd>flèches</kbd> : se déplacer · <kbd>Espace</kbd> : sauter · <kbd>J</kbd> : attaquer. Brisez les jarres de la cour.</p>
+  </div>
+  <div class="droite">
+    <div class="plaque compteur" aria-live="polite">Jarres brisées : <b id="nb-jarres">0</b> / <span id="total-jarres">8</span></div>
+    <button id="ouvrir-atelier" type="button" class="plaque">Votre personnage</button>
+  </div>
+</div>
+
+<div class="tactile" id="tactile">
+  <div id="manette" aria-hidden="true"><span></span></div>
+  <div class="boutons">
+    <button id="b-saut" type="button">Saut</button>
+    <button id="b-coup" type="button">Coup</button>
+  </div>
+</div>
+
+<aside id="atelier" hidden aria-labelledby="atelier-titre">
+  <header>
+    <h2 id="atelier-titre">Votre personnage</h2>
+    <button id="fermer-atelier" type="button">Fermer</button>
+  </header>
+
+  <section>
+    <h3>1. La planche</h3>
+    <div class="depot" id="depot">
+      <input id="fichier" type="file" accept="image/*">
+      <p>Choisissez ou glissez ici votre sprite sheet (PNG de préférence). Elle reste sur cet appareil : rien n'est envoyé.</p>
+    </div>
+    <label class="ligne" for="fond-auto"><input id="fond-auto" type="checkbox" checked> Rendre le fond transparent (couleurs du bord de l'image)</label>
+    <label class="champ" for="tolerance">Tolérance du fond : <span id="tolerance-val">28</span>
+      <input id="tolerance" type="range" min="0" max="90" value="28">
+    </label>
+  </section>
+
+  <section>
+    <h3>2. La grille</h3>
+    <div class="champs">
+      <label class="champ" for="fw">Largeur frame<input id="fw" type="number" min="4" value="48"></label>
+      <label class="champ" for="fh">Hauteur frame<input id="fh" type="number" min="4" value="48"></label>
+      <label class="champ" for="gx">Écart horizontal<input id="gx" type="number" min="0" value="0"></label>
+      <label class="champ" for="gy">Écart vertical<input id="gy" type="number" min="0" value="0"></label>
+    </div>
+    <div class="onglets" role="group" aria-label="Animation à régler">
+      <button type="button" data-anim="idle" aria-pressed="true">Attente</button>
+      <button type="button" data-anim="run" aria-pressed="false">Course</button>
+      <button type="button" data-anim="jump" aria-pressed="false">Saut</button>
+      <button type="button" data-anim="attack" aria-pressed="false">Attaque</button>
+    </div>
+    <div class="champs">
+      <label class="champ" for="ax">X 1re frame<input id="ax" type="number" min="0" value="0"></label>
+      <label class="champ" for="ay">Y 1re frame<input id="ay" type="number" min="0" value="0"></label>
+      <label class="champ" for="nb">Nb de frames<input id="nb" type="number" min="1" value="1"></label>
+      <label class="champ" for="par-ligne">Frames par ligne<input id="par-ligne" type="number" min="1" value="8"></label>
+      <label class="champ" for="fps">Images / s<input id="fps" type="number" min="1" max="30" value="8"></label>
+    </div>
+    <p>Cliquez sur la planche pour placer la première frame de l'animation choisie.</p>
+    <div class="ligne">
+      <label class="champ" for="zoom">Zoom
+        <select id="zoom"><option value="1">1×</option><option value="2" selected>2×</option><option value="3">3×</option></select>
+      </label>
+    </div>
+    <div class="planche"><canvas id="planche" width="16" height="16"></canvas></div>
+  </section>
+
+  <section>
+    <h3>3. En jeu</h3>
+    <div class="apercu">
+      <canvas id="apercu" width="192" height="192"></canvas>
+      <div class="champs" style="flex: 1 1 180px;">
+        <label class="champ" for="pied-x">Pieds X<input id="pied-x" type="number" min="0" value="24"></label>
+        <label class="champ" for="pied-y">Pieds Y<input id="pied-y" type="number" min="0" value="47"></label>
+        <label class="champ" for="regard">Regarde vers
+          <select id="regard"><option value="left">la gauche</option><option value="right">la droite</option></select>
+        </label>
+        <label class="champ" for="echelle">Taille en jeu
+          <select id="echelle"><option value="1">1×</option><option value="1.5">1,5×</option><option value="2">2×</option></select>
+        </label>
+      </div>
+    </div>
+    <p>La croix cyan marque le point posé au sol. Placez-la entre les pieds du personnage.</p>
+    <div class="actions">
+      <button id="appliquer" type="button" class="principal">Jouer avec ce personnage</button>
+      <button id="revenir-kael" type="button">Revenir à Kael</button>
+      <button id="copier" type="button">Copier la configuration</button>
+    </div>
+    <div id="etat" role="status"></div>
+    <textarea id="config-texte" readonly hidden aria-label="Configuration du personnage"></textarea>
+  </section>
+</aside>
+
+<div id="chargement">Chargement des ruines…</div>
+
+<script>
+"use strict";
+// ---------------------------------------------------------------------------------
+// Monde
+// ---------------------------------------------------------------------------------
+const WORLD = { w: 640, h: 416, minX: 32, maxX: 608, minY: 92, maxY: 392 }
+const SPAWN = { x: 320, y: 342 }
+const PROPS = [
+  { k: "pilier", x: 120, y: 160 }, { k: "pilier", x: 520, y: 160 }, { k: "pilier", x: 120, y: 318 },
+  { k: "pilier_brise", x: 520, y: 330 }, { k: "pilier_brise", x: 212, y: 114 },
+  { k: "gravats", x: 238, y: 122 }, { k: "gravats", x: 440, y: 374 }, { k: "gravats", x: 86, y: 244 },
+  { k: "arbre", x: 560, y: 252 },
+  { k: "brasero", x: 272, y: 106 }, { k: "brasero", x: 368, y: 106 }, { k: "brasero", x: 60, y: 300 }, { k: "brasero", x: 584, y: 384 },
+]
+// Emprise au sol (largeur, profondeur) et hauteur franchissable en sautant.
+const SOLID = {
+  pilier: { w: 22, h: 8, z: 999 }, pilier_brise: { w: 22, h: 8, z: 999 }, gravats: { w: 24, h: 7, z: 12 },
+  arbre: { w: 14, h: 6, z: 999 }, brasero: { w: 12, h: 5, z: 30 }, jarre: { w: 10, h: 5, z: 14 },
+}
+const JARRES = [[60, 114], [78, 120], [598, 116], [596, 300], [44, 374], [262, 186], [392, 336], [470, 252]]
+const RUNE = { x: 320, y: 250 }
+
+// ---------------------------------------------------------------------------------
+// Chargement
+// ---------------------------------------------------------------------------------
+const loadImg = (src) => new Promise((ok, ko) => {
+  const i = new Image()
+  i.onload = () => ok(i)
+  i.onerror = () => ko(new Error("Image introuvable : " + src))
+  i.src = src
+})
+const loadJson = (src) => fetch(src).then((r) => { if (!r.ok) throw new Error("Fichier introuvable : " + src); return r.json() })
+
+function animsFromAtlas(atlas, map) {
+  const names = Object.keys(atlas.frames), out = {}
+  for (const [key, tag] of Object.entries(map)) {
+    const t = atlas.meta.frameTags.find((x) => x.name === tag)
+    const frames = [], durs = []
+    for (let i = t.from; i <= t.to; i++) {
+      const f = atlas.frames[names[i]]
+      frames.push(f.frame), durs.push(f.duration || 100)
+    }
+    out[key] = { frames, durs }
+  }
+  return out
+}
+
+const animLength = (a) => a.durs.reduce((s, d) => s + d, 0)
+function frameAt(a, t, loop) {
+  let tt = loop ? t % animLength(a) : Math.min(t, animLength(a) - 1)
+  for (let i = 0; i < a.durs.length; i++) { if (tt < a.durs[i]) return i; tt -= a.durs[i] }
+  return a.durs.length - 1
+}
+
+// ---------------------------------------------------------------------------------
+// État du jeu
+// ---------------------------------------------------------------------------------
+const canvas = document.getElementById("jeu")
+const ctx = canvas.getContext("2d")
+let VW = 384, VH = 216, SCALE = 1
+let A = null                       // images et atlas
+let KAEL = null                    // personnage par défaut
+const player = { x: SPAWN.x, y: SPAWN.y, z: 0, vz: 0, dir: "left", animKey: "idle", animT: 0, attackT: -1, hitDone: false, char: null }
+const cam = { x: 0, y: 0 }
+const jarres = JARRES.map(([x, y]) => ({ x, y, alive: true, respawn: 0 }))
+let broken = 0
+const particles = []
+const leaves = []
+let time = 0
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches
+
+function resize() {
+  const w = innerWidth, h = innerHeight
+  SCALE = Math.max(1, Math.round(Math.min(w, h) / 200))
+  VW = Math.ceil(w / SCALE), VH = Math.ceil(h / SCALE)
+  canvas.width = VW, canvas.height = VH
+  canvas.style.width = VW * SCALE + "px", canvas.style.height = VH * SCALE + "px"
+  ctx.imageSmoothingEnabled = false
+}
+addEventListener("resize", resize)
+
+// ---------------------------------------------------------------------------------
+// Entrées : clavier, manette tactile, boutons
+// ---------------------------------------------------------------------------------
+const input = { x: 0, y: 0, jump: false, attack: false }
+const keys = new Set()
+const KEYMAP = {
+  left: ["ArrowLeft", "KeyA"], right: ["ArrowRight", "KeyD"], up: ["ArrowUp", "KeyW"], down: ["ArrowDown", "KeyS"],
+}
+const atelierOuvert = () => !document.getElementById("atelier").hidden
+addEventListener("keydown", (e) => {
+  if (atelierOuvert()) { if (e.key === "Escape") fermerAtelier(); return }
+  if (e.code === "Space") { input.jump = true; e.preventDefault() }
+  else if (e.code === "KeyJ" || e.code === "KeyX" || e.code === "Enter") input.attack = true
+  if (e.code.startsWith("Arrow")) e.preventDefault()
+  keys.add(e.code)
+  masquerAide()
+})
+addEventListener("keyup", (e) => keys.delete(e.code))
+addEventListener("blur", () => keys.clear())
+
+const joy = { id: null, x: 0, y: 0 }
+const manette = document.getElementById("manette"), knob = manette.querySelector("span")
+function joyMove(e) {
+  const r = manette.getBoundingClientRect(), R = r.width / 2
+  let dx = e.clientX - (r.left + R), dy = e.clientY - (r.top + R)
+  const d = Math.hypot(dx, dy)
+  if (d > R) dx *= R / d, dy *= R / d
+  knob.style.transform = `translate(${dx}px, ${dy}px)`
+  const n = Math.hypot(dx, dy) / R
+  joy.x = n < 0.18 ? 0 : dx / R, joy.y = n < 0.18 ? 0 : dy / R
+}
+manette.addEventListener("pointerdown", (e) => { joy.id = e.pointerId; manette.setPointerCapture(e.pointerId); joyMove(e); masquerAide() })
+manette.addEventListener("pointermove", (e) => { if (e.pointerId === joy.id) joyMove(e) })
+const joyEnd = (e) => { if (e.pointerId !== joy.id) return; joy.id = null; joy.x = joy.y = 0; knob.style.transform = "" }
+manette.addEventListener("pointerup", joyEnd)
+manette.addEventListener("pointercancel", joyEnd)
+document.getElementById("b-saut").addEventListener("pointerdown", (e) => { e.preventDefault(); input.jump = true })
+document.getElementById("b-coup").addEventListener("pointerdown", (e) => { e.preventDefault(); input.attack = true })
+document.getElementById("scene").addEventListener("pointerdown", (e) => { if (e.pointerType === "mouse") input.attack = true })
+
+const tactile = document.getElementById("tactile")
+const activerTactile = () => tactile.classList.add("actif")
+if (matchMedia("(pointer: coarse)").matches) activerTactile()
+addEventListener("touchstart", activerTactile, { once: true, passive: true })
+
+let aideMasquee = false
+function masquerAide() {
+  if (aideMasquee) return
+  aideMasquee = true
+  setTimeout(() => { document.getElementById("aide").style.opacity = "0.55" }, 5000)
+}
+
+function lireDirection() {
+  const k = (list) => list.some((c) => keys.has(c))
+  let x = (k(KEYMAP.right) ? 1 : 0) - (k(KEYMAP.left) ? 1 : 0)
+  let y = (k(KEYMAP.down) ? 1 : 0) - (k(KEYMAP.up) ? 1 : 0)
+  if (joy.id !== null) x = joy.x, y = joy.y
+  const len = Math.hypot(x, y)
+  if (len > 1) x /= len, y /= len
+  input.x = x, input.y = y
+}
+
+// ---------------------------------------------------------------------------------
+// Collisions
+// ---------------------------------------------------------------------------------
+let SOLIDS = []
+function buildSolids() {
+  SOLIDS = PROPS.map((p) => ({ ...SOLID[p.k], x: p.x - SOLID[p.k].w / 2, y: p.y - SOLID[p.k].h, src: p }))
+  for (const j of jarres) if (j.alive) SOLIDS.push({ ...SOLID.jarre, x: j.x - 5, y: j.y - 5, src: j })
+}
+function blocked(x, y, z) {
+  const fx = x - 7, fy = y - 5
+  for (const s of SOLIDS) {
+    if (z < s.z && fx < s.x + s.w && fx + 14 > s.x && fy < s.y + s.h && fy + 6 > s.y) return true
+  }
+  return false
+}
+function move(dx, dy) {
+  const was = blocked(player.x, player.y, player.z)
+  const nx = Math.min(WORLD.maxX, Math.max(WORLD.minX, player.x + dx))
+  if (!blocked(nx, player.y, player.z) || was) player.x = nx
+  const ny = Math.min(WORLD.maxY, Math.max(WORLD.minY, player.y + dy))
+  if (!blocked(player.x, ny, player.z) || was) player.y = ny
+}
+
+// ---------------------------------------------------------------------------------
+// Mise à jour
+// ---------------------------------------------------------------------------------
+const GRAVITE = 640, IMPULSION = 215, VITESSE = 92
+
+function update(dt) {
+  const ms = dt * 1000, ch = player.char
+  lireDirection()
+  if (atelierOuvert()) input.x = input.y = 0, input.jump = input.attack = false
+
+  if (input.attack && player.attackT < 0 && player.z === 0) player.attackT = 0, player.hitDone = false
+  if (input.jump && player.z === 0 && player.attackT < 0) player.vz = IMPULSION
+  input.jump = input.attack = false
+
+  const attacking = player.attackT >= 0
+  const speed = attacking ? 0 : VITESSE
+  if (!attacking && input.x < -0.1) player.dir = "left"
+  if (!attacking && input.x > 0.1) player.dir = "right"
+  move(input.x * speed * dt, input.y * speed * 0.72 * dt)
+
+  if (player.z > 0 || player.vz > 0) {
+    player.vz -= GRAVITE * dt
+    player.z = Math.max(0, player.z + player.vz * dt)
+    if (player.z === 0) player.vz = 0, poussiere(player.x, player.y, 5)
+  }
+
+  if (attacking) {
+    player.attackT += ms
+    const a = ch.anims.attack
+    if (!player.hitDone && frameAt(a, player.attackT, false) >= ch.hitFrame) player.hitDone = true, frapper()
+    if (player.attackT >= animLength(a)) player.attackT = -1
+  }
+
+  const moving = Math.hypot(input.x, input.y) > 0.1
+  const key = player.attackT >= 0 ? "attack" : player.z > 0 ? "jump" : moving ? "run" : "idle"
+  if (key !== player.animKey) player.animKey = key, player.animT = 0
+  else player.animT += ms
+  if (key === "run" && Math.floor(player.animT / 250) !== Math.floor((player.animT - ms) / 250)) poussiere(player.x + (player.dir === "left" ? 6 : -6), player.y, 1)
+
+  for (const j of jarres) {
+    if (!j.alive && (j.respawn -= dt) <= 0) {
+      if (Math.hypot(player.x - j.x, player.y - j.y) > 20) j.alive = true, buildSolids(), poussiere(j.x, j.y, 6)
+      else j.respawn = 1
+    }
+  }
+
+  updateParticles(dt)
+  const ty = player.y - player.z * 0.4 - 26
+  const tx = Math.min(WORLD.w - VW, Math.max(0, player.x - VW / 2))
+  const tyc = Math.min(WORLD.h - VH, Math.max(0, ty - VH / 2))
+  const k = reduceMotion ? 1 : Math.min(1, dt * 6)
+  cam.x += ((VW > WORLD.w ? (WORLD.w - VW) / 2 : tx) - cam.x) * k
+  cam.y += ((VH > WORLD.h ? (WORLD.h - VH) / 2 : tyc) - cam.y) * k
+}
+
+function frapper() {
+  const s = player.dir === "left" ? -1 : 1, reach = 38 * (player.char.scale || 1)
+  const x0 = s < 0 ? player.x - reach : player.x + 2, x1 = s < 0 ? player.x - 2 : player.x + reach
+  for (const j of jarres) {
+    if (j.alive && j.x > x0 && j.x < x1 && Math.abs(j.y - player.y) < 20) {
+      j.alive = false, j.respawn = 9, broken++
+      document.getElementById("nb-jarres").textContent = broken
+      eclats(j.x, j.y)
+      buildSolids()
+    }
+  }
+  etincelles(player.x + s * reach * 0.7, player.y - 22)
+}
+
+// ---------------------------------------------------------------------------------
+// Particules : braises, poussière, éclats, feuilles
+// ---------------------------------------------------------------------------------
+function poussiere(x, y, n) {
+  for (let i = 0; i < n; i++) particles.push({ kind: "dust", x: x + (Math.random() - 0.5) * 10, y, z: 1, vx: (Math.random() - 0.5) * 30, vz: 10 + Math.random() * 14, life: 0.45 + Math.random() * 0.3, t: 0 })
+}
+function eclats(x, y) {
+  const cols = ["#a85c3c", "#7a3e2a", "#d08a5a"]
+  for (let i = 0; i < 14; i++) particles.push({ kind: "shard", x, y, z: 6, vx: (Math.random() - 0.5) * 120, vy: (Math.random() - 0.5) * 50, vz: 60 + Math.random() * 90, life: 0.9 + Math.random() * 0.6, t: 0, c: cols[i % 3] })
+  for (let i = 0; i < 8; i++) particles.push({ kind: "spark", x, y: y - 8, vx: (Math.random() - 0.5) * 140, vy: -20 - Math.random() * 80, life: 0.35 + Math.random() * 0.25, t: 0, c: "#ffe08a" })
+}
+function etincelles(x, y) {
+  for (let i = 0; i < 6; i++) particles.push({ kind: "spark", x, y, vx: (Math.random() - 0.5) * 90, vy: (Math.random() - 0.5) * 90, life: 0.25 + Math.random() * 0.2, t: 0, c: "#c8f6ff" })
+}
+function updateParticles(dt) {
+  if (!reduceMotion && Math.random() < dt * 9) {
+    const b = PROPS.filter((p) => p.k === "brasero")[Math.floor(Math.random() * 4)]
+    particles.push({ kind: "ember", x: b.x + (Math.random() - 0.5) * 8, y: b.y - 30, vx: (Math.random() - 0.5) * 8, vy: -18 - Math.random() * 20, life: 1.2 + Math.random() * 1.2, t: 0 })
+  }
+  if (!reduceMotion && Math.random() < dt * 0.9 && leaves.length < 24) {
+    leaves.push({ x: 534 + Math.random() * 54, y: 180 + Math.random() * 24, ground: 200 + Math.random() * 90, ph: Math.random() * 6, t: 0, rest: 0, c: Math.random() < 0.5 ? "#e8904a" : "#c25a26" })
+  }
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i]
+    p.t += dt
+    if (p.t > p.life) { particles.splice(i, 1); continue }
+    if (p.kind === "ember") p.x += (p.vx + Math.sin(p.t * 4 + p.y) * 6) * dt, p.y += p.vy * dt
+    else if (p.kind === "spark") p.x += p.vx * dt, p.y += p.vy * dt, p.vy += 160 * dt
+    else {
+      p.x += p.vx * dt, p.y += (p.vy || 0) * dt, p.vz -= 420 * dt, p.z += p.vz * dt
+      if (p.z < 0) p.z = 0, p.vz *= -0.3, p.vx *= 0.5, p.vy = (p.vy || 0) * 0.5
+    }
+  }
+  for (let i = leaves.length - 1; i >= 0; i--) {
+    const l = leaves[i]
+    l.t += dt
+    if (l.y < l.ground) l.y += 12 * dt, l.x += Math.sin(l.t * 2 + l.ph) * 14 * dt
+    else if ((l.rest += dt) > 5) leaves.splice(i, 1)
+  }
+}
+
+// ---------------------------------------------------------------------------------
+// Rendu
+// ---------------------------------------------------------------------------------
+function propFrame(k) {
+  if (k === "brasero") return A.props.frames["brasero_" + (Math.floor(time * 10) % 6)].frame
+  return A.props.frames[k].frame
+}
+function drawProp(k, x, y) {
+  const f = propFrame(k)
+  ctx.drawImage(A.propsImg, f.x, f.y, f.w, f.h, Math.round(x - f.w / 2 - cam.x), Math.round(y - f.h + 1 - cam.y), f.w, f.h)
+}
+function ombre(x, y, rx, ry, a) {
+  ctx.fillStyle = `rgba(14, 6, 22, ${a})`
+  ctx.beginPath(), ctx.ellipse(Math.round(x - cam.x), Math.round(y - cam.y), rx, ry, 0, 0, Math.PI * 2), ctx.fill()
+}
+
+function drawChar(ch, key, t) {
+  const a = ch.anims[key]
+  let i
+  if (key === "jump") {
+    const n = a.frames.length
+    const p = player.vz > 0 ? (1 - player.vz / IMPULSION) * 0.5 : 0.5 + Math.min(1, -player.vz / IMPULSION) * 0.5
+    i = Math.min(n - 1, Math.floor(p * n))
+  } else i = frameAt(a, t, key !== "attack")
+  const f = a.frames[i], s = ch.scale || 1
+  const flip = (player.dir === "right") !== (ch.facing === "right")
+  const ax = flip ? f.w - ch.anchor.x : ch.anchor.x
+  const dx = Math.round(player.x - ax * s - cam.x), dy = Math.round(player.y - player.z - ch.anchor.y * s - cam.y)
+  if (flip) {
+    ctx.save(), ctx.translate(dx + f.w * s, dy), ctx.scale(-1, 1)
+    ctx.drawImage(ch.img, f.x, f.y, f.w, f.h, 0, 0, f.w * s, f.h * s)
+    ctx.restore()
+  } else ctx.drawImage(ch.img, f.x, f.y, f.w, f.h, dx, dy, f.w * s, f.h * s)
+}
+
+function draw() {
+  ctx.globalCompositeOperation = "source-over"
+  ctx.fillStyle = "#120e18", ctx.fillRect(0, 0, VW, VH)
+  cam.rx = Math.round(cam.x), cam.ry = Math.round(cam.y)
+  const cx = cam.x, cy = cam.y
+  cam.x = cam.rx, cam.y = cam.ry
+  ctx.drawImage(A.sol, -cam.x, -cam.y)
+
+  // Débris de jarres posés au sol, ombres.
+  for (const j of jarres) if (!j.alive) drawProp("jarre_brisee", j.x, j.y + 2)
+  for (const p of PROPS) {
+    const big = p.k === "pilier" || p.k === "arbre"
+    ombre(p.x + 2, p.y - 1, SOLID[p.k].w * 0.6, 3, 0.35)
+    if (big || p.k === "pilier_brise") ombre(p.x + 16, p.y - 2, 18, 3, 0.18)
+  }
+  for (const j of jarres) if (j.alive) ombre(j.x + 1, j.y - 1, 6, 2, 0.35)
+  const sh = Math.max(0.35, 1 - player.z / 80)
+  ombre(player.x + 1, player.y - 1, 11 * sh, 3 * sh, 0.4)
+  for (const l of leaves) {
+    ctx.fillStyle = l.c
+    ctx.fillRect(Math.round(l.x - cam.x), Math.round(l.y - cam.y), 2, 1)
+  }
+
+  // Tri par profondeur.
+  const list = PROPS.map((p) => ({ y: p.y, d: () => drawProp(p.k, p.x, p.y) }))
+  for (const j of jarres) if (j.alive) list.push({ y: j.y, d: () => drawProp("jarre", j.x, j.y) })
+  list.push({ y: player.y + 0.5, d: () => drawChar(player.char, player.animKey, player.animT) })
+  list.sort((a, b) => a.y - b.y)
+  for (const e of list) e.d()
+
+  for (const p of particles) {
+    if (p.kind === "dust") ctx.fillStyle = `rgba(190, 170, 160, ${0.5 * (1 - p.t / p.life)})`
+    else if (p.kind === "shard") ctx.fillStyle = p.c
+    else continue
+    ctx.fillRect(Math.round(p.x - cam.x), Math.round(p.y - (p.z || 0) - cam.y), p.kind === "shard" ? 2 : 1, 1)
+  }
+
+  eclairage()
+
+  ctx.globalCompositeOperation = "lighter"
+  for (const p of particles) {
+    if (p.kind !== "ember" && p.kind !== "spark") continue
+    const a = 1 - p.t / p.life
+    ctx.fillStyle = p.kind === "ember" ? `rgba(255, ${Math.round(120 + 100 * a)}, 60, ${a})` : p.c
+    ctx.fillRect(Math.round(p.x - cam.x), Math.round(p.y - cam.y), 1, 1)
+  }
+  ctx.globalCompositeOperation = "source-over"
+  cam.x = cx, cam.y = cy
+}
+
+// Crépuscule : teinte multipliée, halos des braseros et des runes, vignette.
+function eclairage() {
+  ctx.globalCompositeOperation = "multiply"
+  const g = ctx.createLinearGradient(0, -cam.y, 0, WORLD.h - cam.y)
+  g.addColorStop(0, "#8e7aa8"), g.addColorStop(0.55, "#c8a0a0"), g.addColorStop(1, "#e8b890")
+  ctx.fillStyle = g, ctx.fillRect(0, 0, VW, VH)
+
+  ctx.globalCompositeOperation = "screen"
+  for (const [i, b] of PROPS.filter((p) => p.k === "brasero").entries()) {
+    const fl = Math.sin(time * 9 + i * 2) * 3 + Math.sin(time * 23 + i) * 2
+    const x = b.x - cam.x, y = b.y - 26 - cam.y, r = 74 + fl
+    const rg = ctx.createRadialGradient(x, y, 2, x, y, r)
+    rg.addColorStop(0, "rgba(255, 170, 80, 0.55)"), rg.addColorStop(0.4, "rgba(232, 110, 40, 0.22)"), rg.addColorStop(1, "rgba(232, 110, 40, 0)")
+    ctx.fillStyle = rg, ctx.fillRect(x - r, y - r, r * 2, r * 2)
+  }
+  const pulse = 0.16 + Math.sin(time * 1.6) * 0.05
+  const rx = RUNE.x - cam.x, ry = RUNE.y - cam.y
+  const rr = ctx.createRadialGradient(rx, ry, 4, rx, ry, 90)
+  rr.addColorStop(0, `rgba(95, 216, 244, ${pulse + 0.1})`), rr.addColorStop(1, "rgba(95, 216, 244, 0)")
+  ctx.fillStyle = rr, ctx.fillRect(rx - 90, ry - 90, 180, 180)
+
+  ctx.globalCompositeOperation = "source-over"
+  const v = ctx.createRadialGradient(VW / 2, VH / 2, Math.min(VW, VH) * 0.35, VW / 2, VH / 2, Math.max(VW, VH) * 0.75)
+  v.addColorStop(0, "rgba(18, 10, 26, 0)"), v.addColorStop(1, "rgba(18, 10, 26, 0.55)")
+  ctx.fillStyle = v, ctx.fillRect(0, 0, VW, VH)
+}
+
+let last = 0
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000 || 0)
+  last = now, time += dt
+  update(dt), draw()
+  requestAnimationFrame(frame)
+}
+
+// ---------------------------------------------------------------------------------
+// Atelier : importer une sprite sheet et la découper en animations
+// ---------------------------------------------------------------------------------
+const ANIMS = ["idle", "run", "jump", "attack"]
+const STORAGE = "ruines-ambre-personnage"
+const at = { src: null, img: null, sheet: null, current: "idle", cfg: defaultCfg(), previewT: 0 }
+function defaultCfg() {
+  const a = () => ({ x: 0, y: 0, n: 1, row: 8, fps: 8 })
+  return { frame: { w: 48, h: 48 }, gap: { x: 0, y: 0 }, anchor: { x: 24, y: 47 }, facing: "left", scale: 1, removeBg: true, tol: 28, anims: { idle: a(), run: a(), jump: a(), attack: a() } }
+}
+const $ = (id) => document.getElementById(id)
+const num = (id, min = 0) => Math.max(min, Math.floor(Number($(id).value) || 0))
+
+// Rend transparentes les couleurs dominantes du bord de l'image (fond uni ou damier).
+function retirerFond(img, tol) {
+  const c = document.createElement("canvas")
+  c.width = img.naturalWidth, c.height = img.naturalHeight
+  const g = c.getContext("2d")
+  g.drawImage(img, 0, 0)
+  const d = g.getImageData(0, 0, c.width, c.height), p = d.data, W = c.width, H = c.height
+  if (p[3] < 250) return c                                  // déjà transparent
+  const hist = new Map()
+  const add = (i) => {
+    const key = (p[i] >> 3) + "," + (p[i + 1] >> 3) + "," + (p[i + 2] >> 3)
+    const e = hist.get(key) || { n: 0, r: 0, g: 0, b: 0 }
+    e.n++, e.r += p[i], e.g += p[i + 1], e.b += p[i + 2], hist.set(key, e)
+  }
+  for (let x = 0; x < W; x++) add(x * 4), add(((H - 1) * W + x) * 4)
+  for (let y = 0; y < H; y++) add(y * W * 4), add((y * W + W - 1) * 4)
+  const fonds = [...hist.values()].sort((a, b) => b.n - a.n).slice(0, 3)
+    .filter((e, i, arr) => i === 0 || e.n > arr[0].n * 0.15).map((e) => [e.r / e.n, e.g / e.n, e.b / e.n])
+  const t2 = tol * tol
+  for (let i = 0; i < p.length; i += 4) {
+    for (const [r, gg, b] of fonds) {
+      const dr = p[i] - r, dg = p[i + 1] - gg, db = p[i + 2] - b
+      if (dr * dr + dg * dg + db * db <= t2) { p[i + 3] = 0; break }
+    }
+  }
+  g.putImageData(d, 0, 0)
+  return c
+}
+
+function framesOf(cfg, a) {
+  const out = []
+  for (let i = 0; i < a.n; i++) {
+    const col = i % a.row, row = Math.floor(i / a.row)
+    out.push({ x: a.x + col * (cfg.frame.w + cfg.gap.x), y: a.y + row * (cfg.frame.h + cfg.gap.y), w: cfg.frame.w, h: cfg.frame.h })
+  }
+  return out
+}
+function charFromCfg(cfg, sheet) {
+  const anims = {}
+  for (const k of ANIMS) {
+    const frames = framesOf(cfg, cfg.anims[k])
+    anims[k] = { frames, durs: frames.map(() => 1000 / cfg.anims[k].fps) }
+  }
+  return { img: sheet, anims, anchor: cfg.anchor, facing: cfg.facing, scale: cfg.scale, hitFrame: Math.floor(cfg.anims.attack.n / 2) }
+}
+
+function lireChamps() {
+  const c = at.cfg, a = c.anims[at.current]
+  c.frame.w = num("fw", 4), c.frame.h = num("fh", 4), c.gap.x = num("gx"), c.gap.y = num("gy")
+  a.x = num("ax"), a.y = num("ay"), a.n = num("nb", 1), a.row = num("par-ligne", 1), a.fps = Math.min(30, num("fps", 1))
+  c.anchor.x = num("pied-x"), c.anchor.y = num("pied-y")
+  c.facing = $("regard").value, c.scale = Number($("echelle").value)
+  c.removeBg = $("fond-auto").checked, c.tol = num("tolerance")
+}
+function ecrireChamps() {
+  const c = at.cfg, a = c.anims[at.current]
+  $("fw").value = c.frame.w, $("fh").value = c.frame.h, $("gx").value = c.gap.x, $("gy").value = c.gap.y
+  $("ax").value = a.x, $("ay").value = a.y, $("nb").value = a.n, $("par-ligne").value = a.row, $("fps").value = a.fps
+  $("pied-x").value = c.anchor.x, $("pied-y").value = c.anchor.y
+  $("regard").value = c.facing, $("echelle").value = String(c.scale)
+  $("fond-auto").checked = c.removeBg, $("tolerance").value = c.tol, $("tolerance-val").textContent = c.tol
+  for (const b of document.querySelectorAll(".onglets button")) b.setAttribute("aria-pressed", String(b.dataset.anim === at.current))
+}
+
+function traiterImage() {
+  if (!at.img) return
+  at.sheet = at.cfg.removeBg ? retirerFond(at.img, at.cfg.tol) : (() => {
+    const c = document.createElement("canvas")
+    c.width = at.img.naturalWidth, c.height = at.img.naturalHeight
+    c.getContext("2d").drawImage(at.img, 0, 0)
+    return c
+  })()
+  dessinerPlanche()
+}
+
+function dessinerPlanche() {
+  const pc = $("planche"), g = pc.getContext("2d")
+  if (!at.sheet) { pc.width = pc.height = 16; return }
+  const z = Number($("zoom").value)
+  pc.width = at.sheet.width * z, pc.height = at.sheet.height * z
+  g.imageSmoothingEnabled = false
+  g.drawImage(at.sheet, 0, 0, pc.width, pc.height)
+  for (const k of ANIMS) {
+    const on = k === at.current
+    g.strokeStyle = on ? "#e8904a" : "rgba(95, 216, 244, 0.45)", g.lineWidth = on ? 2 : 1
+    for (const f of framesOf(at.cfg, at.cfg.anims[k])) g.strokeRect(f.x * z + 0.5, f.y * z + 0.5, f.w * z - 1, f.h * z - 1)
+  }
+  const f0 = framesOf(at.cfg, at.cfg.anims[at.current])[0]
+  croix(g, (f0.x + at.cfg.anchor.x) * z, (f0.y + at.cfg.anchor.y) * z, 5)
+}
+function croix(g, x, y, r) {
+  g.strokeStyle = "#5fd8f4", g.lineWidth = 2
+  g.beginPath(), g.moveTo(x - r, y), g.lineTo(x + r, y), g.moveTo(x, y - r), g.lineTo(x, y + r), g.stroke()
+}
+
+function dessinerApercu(dt) {
+  const pc = $("apercu"), g = pc.getContext("2d")
+  g.clearRect(0, 0, pc.width, pc.height)
+  g.strokeStyle = "#463b52", g.beginPath(), g.moveTo(0, 160.5), g.lineTo(pc.width, 160.5), g.stroke()
+  if (!at.sheet) {
+    g.fillStyle = "#a99bb0", g.font = "14px 'Alegreya Sans', sans-serif", g.textAlign = "center"
+    g.fillText("Aperçu de l'animation", pc.width / 2, 96)
+    return
+  }
+  at.previewT += dt * 1000
+  const a = at.cfg.anims[at.current], frames = framesOf(at.cfg, a)
+  const f = frames[Math.floor(at.previewT / (1000 / a.fps)) % frames.length]
+  const z = Math.max(1, Math.min(3, Math.floor(150 / Math.max(f.w, f.h))))
+  g.imageSmoothingEnabled = false
+  g.drawImage(at.sheet, f.x, f.y, f.w, f.h, 96 - at.cfg.anchor.x * z, 160 - at.cfg.anchor.y * z, f.w * z, f.h * z)
+  croix(g, 96, 160, 6)
+}
+
+function etat(msg) { $("etat").textContent = msg }
+
+function chargerFichier(file) {
+  if (!file || !file.type.startsWith("image/")) { etat("Ce fichier n'est pas une image. Choisissez un PNG ou un JPG."); return }
+  const r = new FileReader()
+  r.onload = () => ouvrirImage(r.result, true)
+  r.readAsDataURL(file)
+}
+function ouvrirImage(src, nouveau) {
+  const img = new Image()
+  img.onload = () => {
+    at.src = src, at.img = img
+    if (nouveau) {
+      const probe = document.createElement("canvas").getContext("2d")
+      probe.canvas.width = probe.canvas.height = 1
+      probe.drawImage(img, 0, 0)
+      at.cfg.removeBg = probe.getImageData(0, 0, 1, 1).data[3] > 250
+      ecrireChamps()
+      etat(`Planche chargée : ${img.naturalWidth} × ${img.naturalHeight} px. Réglez la taille d'une frame, puis cliquez sur la première frame de chaque animation.`)
+    }
+    traiterImage()
+  }
+  img.onerror = () => etat("Impossible de lire cette image.")
+  img.src = src
+}
+
+function appliquer(silencieux) {
+  if (!at.sheet) { etat("Chargez d'abord une planche de sprites."); return }
+  player.char = charFromCfg(at.cfg, at.sheet)
+  player.animT = 0, player.attackT = -1
+  try { localStorage.setItem(STORAGE, JSON.stringify({ src: at.src, cfg: at.cfg })) } catch {}
+  if (!silencieux) etat("Votre personnage est dans la cour. Fermez l'atelier pour jouer.")
+}
+
+function ouvrirAtelier() { $("atelier").hidden = false, ecrireChamps(), dessinerPlanche(), $("fermer-atelier").focus() }
+function fermerAtelier() { $("atelier").hidden = true, $("ouvrir-atelier").focus() }
+
+function brancherAtelier() {
+  $("ouvrir-atelier").addEventListener("click", ouvrirAtelier)
+  $("fermer-atelier").addEventListener("click", fermerAtelier)
+  $("fichier").addEventListener("change", (e) => chargerFichier(e.target.files[0]))
+  const depot = $("depot")
+  depot.addEventListener("dragover", (e) => { e.preventDefault(), depot.classList.add("survol") })
+  depot.addEventListener("dragleave", () => depot.classList.remove("survol"))
+  depot.addEventListener("drop", (e) => { e.preventDefault(), depot.classList.remove("survol"), chargerFichier(e.dataTransfer.files[0]) })
+  for (const id of ["fw", "fh", "gx", "gy", "ax", "ay", "nb", "par-ligne", "fps", "pied-x", "pied-y", "regard", "echelle"]) {
+    $(id).addEventListener("input", () => { lireChamps(), dessinerPlanche() })
+  }
+  for (const id of ["fond-auto", "tolerance"]) {
+    $(id).addEventListener("input", () => { lireChamps(), $("tolerance-val").textContent = at.cfg.tol, traiterImage() })
+  }
+  $("zoom").addEventListener("change", dessinerPlanche)
+  for (const b of document.querySelectorAll(".onglets button")) {
+    b.addEventListener("click", () => { lireChamps(), at.current = b.dataset.anim, at.previewT = 0, ecrireChamps(), dessinerPlanche() })
+  }
+  $("planche").addEventListener("click", (e) => {
+    if (!at.sheet) return
+    const z = Number($("zoom").value), r = e.target.getBoundingClientRect()
+    const a = at.cfg.anims[at.current]
+    a.x = Math.floor((e.clientX - r.left) / z), a.y = Math.floor((e.clientY - r.top) / z)
+    ecrireChamps(), dessinerPlanche()
+  })
+  $("appliquer").addEventListener("click", () => appliquer(false))
+  $("revenir-kael").addEventListener("click", () => {
+    player.char = KAEL, player.animT = 0, player.attackT = -1
+    try { localStorage.removeItem(STORAGE) } catch {}
+    etat("Kael est de retour. Votre planche reste chargée dans l'atelier.")
+  })
+  $("copier").addEventListener("click", () => {
+    const txt = JSON.stringify({ ...at.cfg }, null, 2), ta = $("config-texte")
+    navigator.clipboard.writeText(txt).then(
+      () => etat("Configuration copiée."),
+      () => { ta.hidden = false, ta.value = txt, ta.select(), etat("Copie bloquée : sélectionnez le texte ci-dessous.") })
+  })
+  let lastP = performance.now()
+  const boucle = (now) => {
+    if (atelierOuvert()) dessinerApercu((now - lastP) / 1000)
+    lastP = now
+    requestAnimationFrame(boucle)
+  }
+  requestAnimationFrame(boucle)
+}
+
+function restaurer() {
+  let saved = null
+  try { saved = JSON.parse(localStorage.getItem(STORAGE) || "null") } catch {}
+  if (!saved || !saved.src || !saved.cfg) return
+  at.cfg = { ...defaultCfg(), ...saved.cfg }
+  const img = new Image()
+  img.onload = () => { at.src = saved.src, at.img = img, traiterImage(), appliquer(true) }
+  img.src = saved.src
+}
+
+// ---------------------------------------------------------------------------------
+// Démarrage
+// ---------------------------------------------------------------------------------
+async function start(data) {
+  resize()
+  try {
+    const [kaelImg, kaelAtlas, propsImg, props, sol] = await Promise.all([
+      loadImg("assets/kael_jeu.png"), loadJson("assets/kael_jeu.json"),
+      loadImg("assets/ruines_props.png"), loadJson("assets/ruines_props.json"), loadImg("assets/ruines_sol.png"),
+    ])
+    A = { propsImg, props, sol }
+    KAEL = {
+      img: kaelImg, anchor: { x: 32, y: 62 }, facing: "left", scale: 1, hitFrame: 3,
+      anims: animsFromAtlas(kaelAtlas, { idle: "kael_attente", run: "kael_course", jump: "kael_saut", attack: "kael_attaque" }),
+    }
+  } catch (err) {
+    $("chargement").textContent = err.message
+    return
+  }
+  player.char = KAEL
+  if (data && typeof data.x === "number") player.x = data.x, player.y = data.y, player.dir = data.dir || "left"
+  document.getElementById("total-jarres").textContent = jarres.length
+  buildSolids()
+  brancherAtelier()
+  restaurer()
+  cam.x = Math.max(0, player.x - VW / 2), cam.y = Math.max(0, player.y - VH / 2)
+  $("chargement").hidden = true
+  requestAnimationFrame((t) => { last = t, requestAnimationFrame(frame) })
+}
+
+window.claude?.hot?.snapshot?.(() => ({ x: player.x, y: player.y, dir: player.dir }))
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {})
+</script>
